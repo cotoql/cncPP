@@ -26,4 +26,6 @@ module.exports = {
   posicionDestino: { x: 250, y: 150 },
 
   pausaEntreCiclos: 500, // ms
+
+  puertoWebSocket: Number(process.env.CNC_PUERTO_WS) || 8080, // servidor para el simulador
 };

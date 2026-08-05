@@ -164,6 +164,13 @@
     border: 1px solid var(--muted);
     color: var(--text);
   }
+  .conexion {
+    font-size: 11px;
+    margin-top: 10px;
+    margin-bottom: 0;
+  }
+  .conexion.conectado { color: var(--ok); }
+  .conexion.desconectado { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -190,9 +197,10 @@
       <span>Pinza: <b id="valPinza">Abierta</b></span>
     </div>
     <div class="controles">
-      <button id="btnIniciar">▶ Iniciar ciclo</button>
+      <button id="btnIniciar">▶ Modo demo</button>
       <button id="btnPausar" class="secundario" disabled>⏸ Pausar</button>
     </div>
+    <p id="estadoConexion" class="conexion desconectado">● Sin conexión al controlador — modo demo disponible</p>
   </div>
 
   <div class="panel log" id="log"></div>
@@ -239,10 +247,13 @@
   const valZ = document.getElementById('valZ');
   const valPinza = document.getElementById('valPinza');
 
-  let corriendo = false;
-  let pasoActual = 0;
+  const estadoConexion = document.getElementById('estadoConexion');
 
-  // Construir el log inicial
+  let corriendoDemo = false;
+  let pasoActualDemo = 0;
+  let conectadoAlControlador = false;
+
+  // Construir el log inicial con la secuencia de referencia
   secuencia.forEach((paso, indice) => {
     const linea = document.createElement('div');
     linea.className = 'log-linea';
@@ -251,8 +262,9 @@
     log.appendChild(linea);
   });
 
-  function actualizarLog(indice) {
+  function marcarLogPorTexto(pasoTexto) {
     document.querySelectorAll('.log-linea').forEach((el) => el.classList.remove('activa'));
+    const indice = secuencia.findIndex((p) => p.texto === pasoTexto);
     const activa = document.getElementById(`logLinea${indice}`);
     if (activa) {
       activa.classList.add('activa');
@@ -260,60 +272,117 @@
     }
   }
 
-  function aplicarPaso(paso) {
-    cabezal.style.left = `${mapearX(paso.x)}px`;
-    cabezal.style.top = `${mapearY(paso.y)}px`;
+  /**
+   * Aplica un estado a la escena. Sirve tanto para el modo demo
+   * (usa x/y/z/pinza/esperaSensor de la secuencia local) como para
+   * el estado real que llega por WebSocket (mismos campos, distinto origen).
+   */
+  function aplicarEstado(estado) {
+    cabezal.style.left = `${mapearX(estado.x)}px`;
+    cabezal.style.top = `${mapearY(estado.y)}px`;
 
-    cabezal.classList.toggle('bajo', paso.z === 0);
+    cabezal.classList.toggle('bajo', estado.z === 0);
 
-    if (paso.pinza) {
+    if (estado.pinza) {
       cabezal.classList.remove('pinza-abierta', 'pinza-cerrada');
-      cabezal.classList.add(paso.pinza === 'cerrada' ? 'pinza-cerrada' : 'pinza-abierta');
-      valPinza.textContent = paso.pinza === 'cerrada' ? 'Cerrada' : 'Abierta';
+      cabezal.classList.add(estado.pinza === 'cerrada' ? 'pinza-cerrada' : 'pinza-abierta');
+      valPinza.textContent = estado.pinza === 'cerrada' ? 'Cerrada' : 'Abierta';
     }
 
-    valX.textContent = paso.x;
-    valY.textContent = paso.y;
-    valZ.textContent = paso.z;
+    valX.textContent = estado.x;
+    valY.textContent = estado.y;
+    valZ.textContent = estado.z;
 
-    sensor.classList.toggle('activo', !!paso.esperaSensor);
+    sensor.classList.toggle('activo', !!estado.sensorActivo || !!estado.esperaSensor);
+
+    if (estado.pasoTexto) marcarLogPorTexto(estado.pasoTexto);
   }
 
   function esperar(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async function ejecutarCiclo() {
-    while (corriendo) {
-      const paso = secuencia[pasoActual];
-      actualizarLog(pasoActual);
-      aplicarPaso(paso);
+  // --------- Modo demo: recorre la secuencia local sin datos reales ---------
+  async function ejecutarCicloDemo() {
+    while (corriendoDemo) {
+      const paso = secuencia[pasoActualDemo];
+      aplicarEstado({ ...paso, pasoTexto: paso.texto, sensorActivo: paso.esperaSensor });
 
       const duracion = paso.esperaSensor ? 1500 : 950;
       await esperar(duracion);
 
-      if (!corriendo) break;
-
-      pasoActual = (pasoActual + 1) % secuencia.length;
+      if (!corriendoDemo) break;
+      pasoActualDemo = (pasoActualDemo + 1) % secuencia.length;
     }
   }
 
   btnIniciar.addEventListener('click', () => {
-    if (corriendo) return;
-    corriendo = true;
+    if (conectadoAlControlador) return; // con conexión real, el demo no aplica
+    if (corriendoDemo) return;
+    corriendoDemo = true;
     btnIniciar.disabled = true;
     btnPausar.disabled = false;
-    ejecutarCiclo();
+    ejecutarCicloDemo();
   });
 
   btnPausar.addEventListener('click', () => {
-    corriendo = false;
+    corriendoDemo = false;
     btnIniciar.disabled = false;
     btnPausar.disabled = true;
   });
 
-  // Estado inicial en pantalla
-  aplicarPaso(secuencia[0]);
+  // --------- Conexión real por WebSocket al controlador (src/index.js) ---------
+  const URL_WEBSOCKET = 'ws://localhost:8080';
+
+  function conectarAlControlador() {
+    let socket;
+    try {
+      socket = new WebSocket(URL_WEBSOCKET);
+    } catch (error) {
+      programarReintento();
+      return;
+    }
+
+    socket.onopen = () => {
+      conectadoAlControlador = true;
+      corriendoDemo = false;
+      estadoConexion.textContent = '● Conectado al controlador — mostrando movimiento real';
+      estadoConexion.classList.remove('desconectado');
+      estadoConexion.classList.add('conectado');
+      btnIniciar.disabled = true;
+      btnPausar.disabled = true;
+    };
+
+    socket.onmessage = (evento) => {
+      try {
+        const estado = JSON.parse(evento.data);
+        aplicarEstado(estado);
+      } catch (error) {
+        console.error('Mensaje inválido del controlador:', error);
+      }
+    };
+
+    socket.onclose = () => {
+      conectadoAlControlador = false;
+      estadoConexion.textContent = '● Sin conexión al controlador — modo demo disponible';
+      estadoConexion.classList.remove('conectado');
+      estadoConexion.classList.add('desconectado');
+      btnIniciar.disabled = false;
+      programarReintento();
+    };
+
+    socket.onerror = () => {
+      socket.close();
+    };
+  }
+
+  function programarReintento() {
+    setTimeout(conectarAlControlador, 3000);
+  }
+
+  // Estado inicial en pantalla (modo demo) mientras se intenta conectar
+  aplicarEstado({ ...secuencia[0], pasoTexto: secuencia[0].texto });
+  conectarAlControlador();
 </script>
 
 </body>

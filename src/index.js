@@ -7,11 +7,13 @@
  */
 
 const serialService = require('./services/serialService');
+const websocketService = require('./services/websocketService');
 const cncController = require('./controllers/cncController');
 const configuracion = require('./config/configuracion');
 
 async function iniciarProceso() {
   try {
+    websocketService.iniciarServidorWebSocket();
     await serialService.inicializarConexion();
     await cncController.irAHome();
     await cncController.irAPosicionEspera();
@@ -24,6 +26,7 @@ async function iniciarProceso() {
   } catch (error) {
     console.error('Error en el proceso:', error.message);
     serialService.cerrarConexion();
+    websocketService.detenerServidorWebSocket();
     process.exit(1);
   }
 }
@@ -32,6 +35,7 @@ async function iniciarProceso() {
 process.on('SIGINT', () => {
   console.log('\nDeteniendo proceso...');
   serialService.cerrarConexion();
+  websocketService.detenerServidorWebSocket();
   process.exit(0);
 });
 
