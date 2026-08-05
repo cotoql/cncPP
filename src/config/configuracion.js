@@ -15,15 +15,15 @@ module.exports = {
   estadoSensorActivo: 1, // Valor lógico que indica "pieza detectada"
 
   servoPinza: 0,          // Índice del servo (P0) usado como pinza
-  anguloCerrado: 30,      // Ángulo del servo para cerrar la pinza
-  anguloAbierto: 90,      // Ángulo del servo para abrir la pinza
+  anguloCerrado: 70,      // Ángulo del servo para cerrar la pinza
+  anguloAbierto: 20,      // Ángulo del servo para abrir la pinza
 
-  alturaSegura: 20,       // Altura Z de desplazamiento seguro
-  alturaTrabajo: 0,       // Altura Z para tomar/soltar pieza
+  alturaSegura: 0,       // Altura Z de desplazamiento seguro
+  alturaTrabajo: -10,       // Altura Z para tomar/soltar pieza
 
   posicionEspera: { x: 0, y: 0 },
-  posicionRecoger: { x: 100, y: 50 },
-  posicionDestino: { x: 250, y: 150 },
+  posicionRecoger: { x: -100, y: -50 },
+  posicionDestino: { x: -200, y: -200 },
 
   pausaEntreCiclos: 500, // ms
 

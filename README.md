@@ -4,7 +4,6 @@ Controlador en Node.js para automatizar un ciclo de "recoger y colocar" en una C
 
 ## Estructura del proyecto
 
-```
 cnc-pick-and-place/
 ├── src/
 │   ├── config/
@@ -21,11 +20,9 @@ cnc-pick-and-place/
 ├── .gitignore
 ├── package.json
 └── README.md
-```
 
 ## Arquitectura del ciclo
 
-```
 Inicio
    │
    ▼
@@ -66,7 +63,6 @@ G1 X0 Y0 Z20  ; Volver a espera
    │
    ▼
 Repetir
-```
 
 ## Requisitos
 
