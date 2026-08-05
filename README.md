@@ -98,7 +98,12 @@ npm start
 
 ## Simulador visual
 
-Abre `src/public/simulador.html` directamente en el navegador (doble clic) para ver una animación del ciclo completo sin necesidad de conectar el Arduino.
+`src/public/simulador.html` se puede usar de dos formas:
+
+1. **Modo demo** (sin Arduino): ábrelo directamente en el navegador (doble clic) y presiona "Modo demo" para ver una animación de referencia del ciclo.
+2. **Modo en vivo** (con el controlador corriendo): al ejecutar `npm start`, se levanta un servidor WebSocket en `ws://localhost:8080` que transmite la posición X/Y/Z, el estado de la pinza y el sensor en tiempo real. Si el simulador detecta ese servidor activo, se conecta automáticamente y refleja el movimiento real de la máquina en vez de la secuencia simulada.
+
+El puerto del WebSocket se puede cambiar con la variable `CNC_PUERTO_WS` en `.env`.
 
 ## Licencia
 
