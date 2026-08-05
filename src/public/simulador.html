@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Simulador CNC Pick and Place</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --accent: #38bdf8;
+    --accent2: #facc15;
+    --ok: #22c55e;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  p.subtitulo { color: var(--muted); margin-top: 0; margin-bottom: 20px; font-size: 13px; }
+  .contenedor {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 900px;
+  }
+  .panel {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .escenario {
+    position: relative;
+    width: 420px;
+    height: 300px;
+    background:
+      linear-gradient(0deg, transparent 24%, rgba(255,255,255,.04) 25%, rgba(255,255,255,.04) 26%, transparent 27%, transparent 74%, rgba(255,255,255,.04) 75%, rgba(255,255,255,.04) 76%, transparent 77%, transparent),
+      linear-gradient(90deg, transparent 24%, rgba(255,255,255,.04) 25%, rgba(255,255,255,.04) 26%, transparent 27%, transparent 74%, rgba(255,255,255,.04) 75%, rgba(255,255,255,.04) 76%, transparent 77%, transparent),
+      #111827;
+    background-size: 40px 40px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    overflow: hidden;
+  }
+  .zona {
+    position: absolute;
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    border: 1px dashed var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .cabezal {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    transform: translate(-50%, -50%);
+    transition: left 0.9s ease, top 0.9s ease;
+  }
+  .cabezal .cuerpo {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+    transition: background 0.3s, box-shadow 0.3s, transform 0.4s;
+  }
+  .cabezal.bajo .cuerpo {
+    background: var(--accent2);
+    box-shadow: 0 0 14px var(--accent2);
+    transform: scale(0.7);
+  }
+  .cabezal .pinza {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+  }
+  .cabezal .pinza span {
+    width: 3px;
+    height: 10px;
+    background: var(--text);
+    border-radius: 2px;
+    transition: transform 0.3s;
+  }
+  .cabezal.pinza-abierta .pinza span:nth-child(1) { transform: rotate(-18deg); }
+  .cabezal.pinza-abierta .pinza span:nth-child(2) { transform: rotate(18deg); }
+  .cabezal.pinza-cerrada .pinza span:nth-child(1) { transform: rotate(4deg); }
+  .cabezal.pinza-cerrada .pinza span:nth-child(2) { transform: rotate(-4deg); }
+
+  .sensor {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .sensor.activo {
+    background: var(--ok);
+    box-shadow: 0 0 8px var(--ok);
+  }
+
+  .log {
+    width: 280px;
+    height: 300px;
+    overflow-y: auto;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+  }
+  .log-linea {
+    padding: 4px 6px;
+    border-radius: 4px;
+    color: var(--muted);
+  }
+  .log-linea.activa {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent);
+    font-weight: bold;
+  }
+  .estado {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-top: 12px;
+    color: var(--muted);
+  }
+  .estado b { color: var(--text); }
+
+  .controles {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+  }
+  button {
+    background: var(--accent);
+    color: #0f172a;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secundario {
+    background: transparent;
+    border: 1px solid var(--muted);
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+
+<h1>Simulador de ciclo Pick and Place</h1>
+<p class="subtitulo">Visualización del recorrido descrito en cncController.js (no requiere conexión con el Arduino)</p>
+
+<div class="contenedor">
+  <div class="panel">
+    <div class="escenario" id="escenario">
+      <div class="zona" id="zonaEspera" style="left: 6px; top: 6px;">ESPERA</div>
+      <div class="zona" id="zonaRecoger" style="left: 130px; top: 150px;">RECOGER</div>
+      <div class="zona" id="zonaDestino" style="left: 330px; top: 220px;">DESTINO</div>
+      <div class="sensor" id="sensor" style="left: 155px; top: 175px;"></div>
+      <div class="cabezal pinza-abierta" id="cabezal">
+        <div class="pinza"><span></span><span></span></div>
+        <div class="cuerpo"></div>
+      </div>
+    </div>
+    <div class="estado">
+      <span>X: <b id="valX">0</b></span>
+      <span>Y: <b id="valY">0</b></span>
+      <span>Z: <b id="valZ">20</b></span>
+      <span>Pinza: <b id="valPinza">Abierta</b></span>
+    </div>
+    <div class="controles">
+      <button id="btnIniciar">▶ Iniciar ciclo</button>
+      <button id="btnPausar" class="secundario" disabled>⏸ Pausar</button>
+    </div>
+  </div>
+
+  <div class="panel log" id="log"></div>
+</div>
+
+<script>
+  // --------- Mapeo de coordenadas de máquina -> píxeles del escenario ---------
+  // Escenario: 420 x 300 px. Rango de trabajo simulado: X 0-300, Y 0-200 mm.
+  const escenarioAncho = 420;
+  const escenarioAlto = 300;
+  const margen = 20;
+
+  function mapearX(x) {
+    return margen + (x / 300) * (escenarioAncho - margen * 2);
+  }
+  function mapearY(y) {
+    // Y invertido para que 0 quede abajo, como en la CNC real
+    return escenarioAlto - margen - (y / 200) * (escenarioAlto - margen * 2);
+  }
+
+  // --------- Secuencia del ciclo (idéntica a cncController.js) ---------
+  const secuencia = [
+    { gcode: 'G28', texto: 'Home', x: 0, y: 0, z: 20 },
+    { gcode: 'G1 X0 Y0 Z20', texto: 'Posición de espera', x: 0, y: 0, z: 20 },
+    { gcode: 'Esperar sensor', texto: 'Esperando pieza...', x: 0, y: 0, z: 20, esperaSensor: true },
+    { gcode: 'G1 X100 Y50', texto: 'Ir a recoger', x: 100, y: 50, z: 20 },
+    { gcode: 'G1 Z0', texto: 'Bajar', x: 100, y: 50, z: 0 },
+    { gcode: 'M280 P0 S30', texto: 'Cerrar pinza', x: 100, y: 50, z: 0, pinza: 'cerrada' },
+    { gcode: 'G1 Z20', texto: 'Subir', x: 100, y: 50, z: 20 },
+    { gcode: 'G1 X250 Y150', texto: 'Ir al destino', x: 250, y: 150, z: 20 },
+    { gcode: 'G1 Z0', texto: 'Bajar', x: 250, y: 150, z: 0 },
+    { gcode: 'M280 P0 S90', texto: 'Abrir pinza', x: 250, y: 150, z: 0, pinza: 'abierta' },
+    { gcode: 'G1 Z20', texto: 'Subir', x: 250, y: 150, z: 20 },
+    { gcode: 'G1 X0 Y0 Z20', texto: 'Volver a espera', x: 0, y: 0, z: 20 },
+  ];
+
+  const cabezal = document.getElementById('cabezal');
+  const sensor = document.getElementById('sensor');
+  const log = document.getElementById('log');
+  const btnIniciar = document.getElementById('btnIniciar');
+  const btnPausar = document.getElementById('btnPausar');
+  const valX = document.getElementById('valX');
+  const valY = document.getElementById('valY');
+  const valZ = document.getElementById('valZ');
+  const valPinza = document.getElementById('valPinza');
+
+  let corriendo = false;
+  let pasoActual = 0;
+
+  // Construir el log inicial
+  secuencia.forEach((paso, indice) => {
+    const linea = document.createElement('div');
+    linea.className = 'log-linea';
+    linea.id = `logLinea${indice}`;
+    linea.textContent = `${paso.gcode.padEnd(18, ' ')} ; ${paso.texto}`;
+    log.appendChild(linea);
+  });
+
+  function actualizarLog(indice) {
+    document.querySelectorAll('.log-linea').forEach((el) => el.classList.remove('activa'));
+    const activa = document.getElementById(`logLinea${indice}`);
+    if (activa) {
+      activa.classList.add('activa');
+      activa.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function aplicarPaso(paso) {
+    cabezal.style.left = `${mapearX(paso.x)}px`;
+    cabezal.style.top = `${mapearY(paso.y)}px`;
+
+    cabezal.classList.toggle('bajo', paso.z === 0);
+
+    if (paso.pinza) {
+      cabezal.classList.remove('pinza-abierta', 'pinza-cerrada');
+      cabezal.classList.add(paso.pinza === 'cerrada' ? 'pinza-cerrada' : 'pinza-abierta');
+      valPinza.textContent = paso.pinza === 'cerrada' ? 'Cerrada' : 'Abierta';
+    }
+
+    valX.textContent = paso.x;
+    valY.textContent = paso.y;
+    valZ.textContent = paso.z;
+
+    sensor.classList.toggle('activo', !!paso.esperaSensor);
+  }
+
+  function esperar(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function ejecutarCiclo() {
+    while (corriendo) {
+      const paso = secuencia[pasoActual];
+      actualizarLog(pasoActual);
+      aplicarPaso(paso);
+
+      const duracion = paso.esperaSensor ? 1500 : 950;
+      await esperar(duracion);
+
+      if (!corriendo) break;
+
+      pasoActual = (pasoActual + 1) % secuencia.length;
+    }
+  }
+
+  btnIniciar.addEventListener('click', () => {
+    if (corriendo) return;
+    corriendo = true;
+    btnIniciar.disabled = true;
+    btnPausar.disabled = false;
+    ejecutarCiclo();
+  });
+
+  btnPausar.addEventListener('click', () => {
+    corriendo = false;
+    btnIniciar.disabled = false;
+    btnPausar.disabled = true;
+  });
+
+  // Estado inicial en pantalla
+  aplicarPaso(secuencia[0]);
+</script>
+
+</body>
+</html>
