@@ -18,7 +18,7 @@ module.exports = {
   anguloCerrado: 70,      // Ángulo del servo para cerrar la pinza
   anguloAbierto: 20,      // Ángulo del servo para abrir la pinza
 
-  alturaSegura: 70,       // Altura Z de desplazamiento seguro
+  alturaSegura: 80,       // Altura Z de desplazamiento seguro
   alturaTrabajo: 0,       // Altura Z para tomar/soltar pieza
 
   posicionEspera: { x: 225, y: 340 },
