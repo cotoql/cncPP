@@ -18,14 +18,17 @@ module.exports = {
   anguloCerrado: 70,      // Ángulo del servo para cerrar la pinza
   anguloAbierto: 20,      // Ángulo del servo para abrir la pinza
 
-  alturaSegura: 0,       // Altura Z de desplazamiento seguro
-  alturaTrabajo: -10,       // Altura Z para tomar/soltar pieza
+  alturaSegura: 70,       // Altura Z de desplazamiento seguro
+  alturaTrabajo: 0,       // Altura Z para tomar/soltar pieza
 
-  posicionEspera: { x: 0, y: 0 },
-  posicionRecoger: { x: -100, y: -50 },
-  posicionDestino: { x: -200, y: -200 },
+  posicionEspera: { x: 225, y: 340 },
+  posicionRecoger: { x: 0, y: 240 },
+  posicionDestino: { x: 225, y: 0 },
 
-  pausaEntreCiclos: 500, // ms
+  pausaEntreCiclos: 2000, // ms
 
   puertoWebSocket: Number(process.env.CNC_PUERTO_WS) || 8080, // servidor para el simulador
+
+  pasosMovimientoServo: 12,   // en cuántos incrementos se divide el barrido angular
+  tiempoEntrePasosServoMs: 25, // pausa entre cada incremento — más alto = más lento/suave
 };

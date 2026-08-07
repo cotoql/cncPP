@@ -27,6 +27,7 @@ const estadoMaquina = {
   pasoTexto: 'Inicio',
   sensorActivo: false,
 };
+let anguloActualServo = configuracion.anguloAbierto;
 
 function actualizarYEmitirEstado(cambios) {
   Object.assign(estadoMaquina, cambios);
@@ -36,6 +37,8 @@ function actualizarYEmitirEstado(cambios) {
 async function irAHome() {
   console.log('Homing (G28)...');
   await serialService.enviarComando('G28');
+  //await cerrarPinza(); // pinza cerrada al inicio
+  //await abrirPinza(); // pinza abierta al inicio
   actualizarYEmitirEstado({
     x: 0,
     y: 0,
@@ -44,6 +47,9 @@ async function irAHome() {
     pasoTexto: 'Home',
     sensorActivo: false,
   });
+console.log('Forzando modo de posicionamiento absoluto (G90)...');
+await serialService.enviarComando('G90');
+actualizarYEmitirEstado({ gcode: 'G90', pasoTexto: 'Modo absoluto' });
 }
 
 async function irAPosicionEspera() {
@@ -87,6 +93,7 @@ async function irADestino() {
 
 async function bajarHerramienta() {
   await serialService.enviarComando(`G1 Z${configuracion.alturaTrabajo}`);
+  await serialService.enviarComando('M400'); // <-- nuevo
   actualizarYEmitirEstado({
     z: configuracion.alturaTrabajo,
     gcode: `G1 Z${configuracion.alturaTrabajo}`,
@@ -96,6 +103,7 @@ async function bajarHerramienta() {
 
 async function subirHerramienta() {
   await serialService.enviarComando(`G1 Z${configuracion.alturaSegura}`);
+  await serialService.enviarComando('M400'); // <-- nuevo
   actualizarYEmitirEstado({
     z: configuracion.alturaSegura,
     gcode: `G1 Z${configuracion.alturaSegura}`,
@@ -103,28 +111,44 @@ async function subirHerramienta() {
   });
 }
 
-async function cerrarPinza() {
-  console.log('Cerrando pinza...');
-  await serialService.enviarComando(
-    `M280 P${configuracion.servoPinza} S${configuracion.anguloCerrado}`
-  );
+async function moverServoSuave(anguloDestino, gcodeReferencia, pasoTexto) {
+  const pasos = configuracion.pasosMovimientoServo;
+  const incremento = (anguloDestino - anguloActualServo) / pasos;
+
+  for (let i = 1; i <= pasos; i++) {
+    const anguloIntermedio = Math.round(anguloActualServo + incremento * i);
+    await serialService.enviarComando(
+      `M280 P${configuracion.servoPinza} S${anguloIntermedio}`
+    );
+    await serialService.enviarComando(`G4 P${configuracion.tiempoEntrePasosServoMs}`);
+  }
+
+  await serialService.enviarComando(`G4 P${configuracion.tiempoEsperaServoMs}`);
+
+  anguloActualServo = anguloDestino;
   actualizarYEmitirEstado({
-    pinza: 'cerrada',
-    gcode: `M280 P${configuracion.servoPinza} S${configuracion.anguloCerrado}`,
-    pasoTexto: 'Cerrar pinza',
+    pinza: anguloDestino === configuracion.anguloCerrado ? 'cerrada' : 'abierta',
+    gcode: gcodeReferencia,
+    pasoTexto,
   });
 }
 
-async function abrirPinza() {
-  console.log('Abriendo pinza...');
-  await serialService.enviarComando(
-    `M280 P${configuracion.servoPinza} S${configuracion.anguloAbierto}`
+async function cerrarPinza() {
+  console.log('Cerrando pinza (suave)...');
+  await moverServoSuave(
+    configuracion.anguloCerrado,
+    `M280 P${configuracion.servoPinza} S${configuracion.anguloCerrado}`,
+    'Cerrar pinza'
   );
-  actualizarYEmitirEstado({
-    pinza: 'abierta',
-    gcode: `M280 P${configuracion.servoPinza} S${configuracion.anguloAbierto}`,
-    pasoTexto: 'Abrir pinza',
-  });
+}
+
+async function abrirPinza() {
+  console.log('Abriendo pinza (suave)...');
+  await moverServoSuave(
+    configuracion.anguloAbierto,
+    `M280 P${configuracion.servoPinza} S${configuracion.anguloAbierto}`,
+    'Abrir pinza'
+  );
 }
 
 /**

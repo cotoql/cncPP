@@ -19,7 +19,7 @@ const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 const configuracion = require('../config/configuracion');
 
-const TIEMPO_MAXIMO_ESPERA_RESPUESTA_MS = 20000; // evita quedar colgado para siempre
+const TIEMPO_MAXIMO_ESPERA_RESPUESTA_MS = 40000; // evita quedar colgado para siempre
 
 let puertoSerial;
 let lectorLineas;

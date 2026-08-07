@@ -45,7 +45,7 @@ async function iniciarProceso() {
     websocketService.iniciarServidorWebSocket();
     await serialService.inicializarConexion();
     await cncController.irAHome();
-    await cncController.irAPosicionEspera();
+    
 
     // Bucle infinito: repite el ciclo mientras el programa esté activo
     while (true) {
